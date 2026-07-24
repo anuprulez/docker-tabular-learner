@@ -1,49 +1,21 @@
-FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+FROM ghcr.io/astral-sh/uv:latest AS uv
+
+# Runtime-only image: Python 3.12, PyTorch 2.13.0+cu130, CUDA 13.0, cuDNN 9.
+FROM pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime
+
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    UV_NO_CACHE=1 \
+    UV_LINK_MODE=copy \
+    HF_HOME=/work/.cache/huggingface
 
-RUN pip install --no-cache-dir \
-    llama-index==0.14.18 \
-    llama-index-embeddings-huggingface==0.7.0 \
-    llama-index-readers-json==0.5.0 \
-    llama-index-readers-file==0.6.0
+WORKDIR /work
 
+# Install into the base environment so uv recognizes and reuses its CUDA Torch
+# instead of resolving a second multi-gigabyte Torch wheel into a venv.
+RUN uv pip install --system --break-system-packages tabicl==2.1.1 \
+    && python -c "import torch; from tabicl import TabICLClassifier, TabICLRegressor; assert torch.__version__ == '2.13.0+cu130'; assert torch.version.cuda == '13.0'"
 
-FROM pytorch/pytorch:2.2.2-cuda12.1-cudnn8-runtime
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Optional: non-root user (comment out if not needed)
-# RUN useradd -ms /bin/bash appuser
-# USER appuser
-# WORKDIR /home/appuser
-
-WORKDIR /workspace
-
-RUN pip install --no-cache-dir huggingface_hub==0.32.4 doclayout-yolo==0.0.4 opencv-python==4.11.0.86 geojson==3.2.0 shapely==2.1.1
-RUN python -c "import doclayout_yolo"
-
-
-
-# Base image with PyTorch + CUDA 12.1 + cuDNN 8 runtime
-FROM pytorch/pytorch:2.2.2-cuda12.1-cudnn8-runtime
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# Use a non-root user for security (optional)
-RUN useradd -ms /bin/bash appuser
-USER appuser
-WORKDIR /home/appuser
-
-# Install your tool from PyPI or any other way ...
-RUN pip install --no-cache-dir doclayout-yolo==0.0.4
+CMD ["python"]
