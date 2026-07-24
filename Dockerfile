@@ -15,7 +15,7 @@ WORKDIR /work
 
 # Install into the base environment so uv recognizes and reuses its CUDA Torch
 # instead of resolving a second multi-gigabyte Torch wheel into a venv.
-RUN uv pip install --system --break-system-packages tabicl==2.1.1 \
+RUN uv pip install --system --break-system-packages tabicl==2.1.1 matplotlib==3.11.1 pandas==3.0.5 \
     && python -c "import torch; from tabicl import TabICLClassifier, TabICLRegressor; assert torch.__version__ == '2.13.0+cu130'; assert torch.version.cuda == '13.0'"
 
 CMD ["python"]
